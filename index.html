@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>xPass++ — Futbolda Karar Kalitesi Ölçümü</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:   #060f1e;
+    --navy2:  #0d1f3c;
+    --navy3:  #112244;
+    --teal:   #0a8f8f;
+    --teal2:  #0ec4c4;
+    --mint:   #4effd8;
+    --mint2:  #a8ffd0;
+    --slate:  #1e3358;
+    --muted:  #4a6080;
+    --white:  #f0f6ff;
+    --grey:   #8fa5c0;
+    --card:   #0b1a30;
+    --border: rgba(14,196,196,0.18);
+    --glow:   0 0 32px rgba(78,255,216,0.12);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--navy);
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+  }
+
+  /* ── GRID MESH BG ── */
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(10,143,143,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(10,143,143,0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  section, header, footer { position: relative; z-index: 1; }
+
+  /* ── TYPOGRAPHY ── */
+  .mono { font-family: 'Space Mono', monospace; }
+  h1, h2, h3 { font-family: 'Space Mono', monospace; font-weight: 700; line-height: 1.2; }
+  h2 { font-size: clamp(1.4rem, 3vw, 2rem); color: var(--white); }
+  h3 { font-size: 1rem; color: var(--teal2); }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--mint);
+    opacity: 0.75;
+    margin-bottom: 0.6rem;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    background: rgba(6,15,30,0.88);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--mint);
+    text-decoration: none;
+  }
+  .nav-logo span { color: var(--teal2); }
+  .nav-links { display: flex; gap: 1.6rem; list-style: none; }
+  .nav-links a {
+    font-size: 0.82rem;
+    letter-spacing: 0.06em;
+    color: var(--grey);
+    text-decoration: none;
+    transition: color .2s;
+  }
+  .nav-links a:hover { color: var(--mint); }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6rem 2rem 4rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--teal2);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.9rem;
+    border-radius: 2px;
+    margin-bottom: 2rem;
+    animation: fadeUp 0.8s ease both;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--mint);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .hero h1 {
+    font-size: clamp(2.8rem, 7vw, 5.5rem);
+    line-height: 1;
+    animation: fadeUp 0.9s 0.1s ease both;
+  }
+  .hero h1 .accent { color: var(--mint); }
+  .hero h1 .accent2 { color: var(--teal2); }
+
+  .hero-desc {
+    max-width: 580px;
+    margin-top: 1.5rem;
+    color: var(--grey);
+    font-size: 1.05rem;
+    font-weight: 300;
+    animation: fadeUp 1s 0.2s ease both;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    margin-top: 2.5rem;
+    background: linear-gradient(135deg, rgba(78,255,216,0.12), rgba(14,196,196,0.06));
+    border: 1px solid var(--mint);
+    border-radius: 4px;
+    padding: 1rem 1.8rem;
+    animation: fadeUp 1.1s 0.3s ease both;
+  }
+  .hero-badge .big {
+    font-family: 'Space Mono', monospace;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--mint);
+    display: block;
+    line-height: 1;
+  }
+  .hero-badge .label {
+    font-size: 0.78rem;
+    color: var(--teal2);
+    letter-spacing: 0.08em;
+  }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    animation: fadeUp 1.4s 0.6s ease both;
+  }
+  .scroll-line {
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(to bottom, var(--teal), transparent);
+    animation: scrollLine 2s infinite;
+  }
+  @keyframes scrollLine {
+    0% { transform: scaleY(0); transform-origin: top; }
+    50% { transform: scaleY(1); transform-origin: top; }
+    51% { transform-origin: bottom; }
+    100% { transform: scaleY(0); transform-origin: bottom; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SECTIONS ── */
+  .section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 5rem 2rem;
+  }
+  .section-header { margin-bottom: 2.5rem; }
+
+  /* ── METRIC CARDS ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+  }
+
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.8rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .25s, transform .25s;
+  }
+  .metric-card:hover {
+    border-color: var(--teal2);
+    transform: translateY(-3px);
+    box-shadow: var(--glow);
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .metric-card.baseline::before { background: var(--muted); }
+  .metric-card.sprint2::before  { background: var(--teal); }
+  .metric-card.xpass::before    { background: linear-gradient(90deg, var(--teal), var(--mint)); }
+
+  .card-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2px;
+    margin-bottom: 1rem;
+    display: inline-block;
+  }
+  .baseline .card-tag { background: rgba(74,96,128,0.3); color: var(--grey); }
+  .sprint2  .card-tag { background: rgba(10,143,143,0.25); color: var(--teal2); }
+  .xpass    .card-tag { background: rgba(78,255,216,0.15); color: var(--mint); }
+
+  .card-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 1.4rem;
+    color: var(--white);
+  }
+
+  .metrics-list { display: flex; flex-direction: column; gap: 0.85rem; }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.88rem;
+  }
+  .metric-name { color: var(--grey); }
+  .metric-val {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .baseline .metric-val { color: var(--grey); }
+  .sprint2  .metric-val { color: var(--teal2); }
+  .xpass    .metric-val { color: var(--mint); }
+
+  .metric-bar {
+    height: 2px;
+    border-radius: 1px;
+    margin-top: 0.3rem;
+    background: var(--slate);
+    position: relative;
+    overflow: hidden;
+  }
+  .metric-bar-fill {
+    height: 100%;
+    border-radius: 1px;
+    position: absolute;
+    top: 0; left: 0;
+    transition: width 1.2s cubic-bezier(.16,1,.3,1);
+  }
+
+  .improvement-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.4rem;
+    padding: 0.6rem 0.9rem;
+    background: rgba(78,255,216,0.07);
+    border: 1px solid rgba(78,255,216,0.2);
+    border-radius: 3px;
+    font-size: 0.78rem;
+    color: var(--mint);
+    font-family: 'Space Mono', monospace;
+  }
+  .improvement-badge .arrow { font-size: 1rem; }
+
+  /* ── FIGURES GRID ── */
+  .figures-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media (max-width: 700px) { .figures-grid { grid-template-columns: 1fr; } }
+
+  .figure-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color .25s;
+  }
+  .figure-card:hover { border-color: var(--teal2); }
+
+  .figure-card img {
+    width: 100%;
+    display: block;
+    background: var(--navy2);
+    min-height: 220px;
+    object-fit: cover;
+  }
+
+  .figure-caption {
+    padding: 1rem 1.2rem;
+    font-size: 0.8rem;
+    color: var(--grey);
+    border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+  }
+  .figure-caption strong { color: var(--teal2); display: block; margin-bottom: 0.2rem; }
+
+  /* ── PITCH FULL ── */
+  .pitch-full {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--card);
+  }
+  .pitch-full img {
+    width: 100%;
+    display: block;
+    min-height: 320px;
+    object-fit: cover;
+    background: var(--navy2);
+  }
+  .pitch-caption {
+    padding: 1.2rem 1.6rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 0.8rem;
+  }
+  .pitch-caption p { font-size: 0.85rem; color: var(--grey); }
+  .pitch-caption .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--mint);
+    background: rgba(78,255,216,0.1);
+    padding: 0.3rem 0.8rem;
+    border-radius: 2px;
+  }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .flow-step {
+    flex: 1;
+    min-width: 160px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-right: none;
+    padding: 1.6rem 1.2rem;
+    position: relative;
+    transition: background .2s;
+  }
+  .flow-step:first-child { border-radius: 6px 0 0 6px; }
+  .flow-step:last-child  { border-radius: 0 6px 6px 0; border-right: 1px solid var(--border); }
+  .flow-step:hover { background: var(--navy2); }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 0.1rem;
+    color: var(--teal);
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .step-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--teal);
+    margin-bottom: 0.6rem;
+  }
+  .step-icon {
+    font-size: 1.6rem;
+    margin-bottom: 0.8rem;
+    display: block;
+  }
+  .step-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 0.5rem;
+  }
+  .step-desc {
+    font-size: 0.78rem;
+    color: var(--grey);
+    line-height: 1.6;
+  }
+  .step-tag {
+    display: inline-block;
+    margin-top: 0.9rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    background: rgba(14,196,196,0.1);
+    color: var(--teal2);
+    border-radius: 2px;
+  }
+
+  @media (max-width: 720px) {
+    .flow { flex-direction: column; }
+    .flow-step { border-right: 1px solid var(--border); border-bottom: none; border-radius: 0; }
+    .flow-step:first-child { border-radius: 6px 6px 0 0; }
+    .flow-step:last-child  { border-radius: 0 0 6px 6px; border-bottom: 1px solid var(--border); }
+    .flow-arrow { display: none; }
+  }
+
+  /* ── TECH DETAILS ── */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+  }
+  @media (max-width: 640px) { .tech-grid { grid-template-columns: 1fr; } }
+
+  .tech-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.6rem;
+  }
+  .tech-card h3 {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal2);
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .spec-list { list-style: none; display: flex; flex-direction: column; gap: 0.7rem; }
+  .spec-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    gap: 1rem;
+  }
+  .spec-key { color: var(--grey); }
+  .spec-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--mint);
+    text-align: right;
+  }
+
+  .code-block {
+    background: var(--navy);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--teal2);
+    line-height: 1.8;
+    margin-top: 0.8rem;
+    overflow-x: auto;
+  }
+  .code-block .comment { color: var(--muted); }
+  .code-block .kw { color: var(--mint); }
+  .code-block .num { color: #ff9e7a; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2.5rem 2rem;
+    text-align: center;
+  }
+  .footer-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .footer-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--mint);
+  }
+  .footer-meta {
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .footer-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    justify-content: center;
+    margin-top: 0.4rem;
+  }
+  .footer-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    border: 1px solid rgba(10,143,143,0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+  }
+
+  /* ── IMAGE PLACEHOLDER ── */
+  .img-placeholder {
+    width: 100%;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--navy2) 0%, var(--slate) 100%);
+    color: var(--muted);
+    gap: 0.6rem;
+  }
+  .img-placeholder svg { opacity: 0.4; }
+  .img-placeholder span { font-family: 'Space Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em; opacity: 0.6; }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .reveal-delay-1 { transition-delay: .1s; }
+  .reveal-delay-2 { transition-delay: .2s; }
+  .reveal-delay-3 { transition-delay: .3s; }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">xPass<span>++</span></a>
+  <ul class="nav-links">
+    <li><a href="#metrics">Metrikler</a></li>
+    <li><a href="#figures">Grafikler</a></li>
+    <li><a href="#pitch">Saha</a></li>
+    <li><a href="#how">Nasıl Çalışır</a></li>
+    <li><a href="#tech">Teknik</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow">Graf Sinir Ağı · Futbol Analizi · GAT</div>
+  <h1>xPass<span class="accent">++</span><br><span class="accent2">DQS</span></h1>
+  <p class="hero-desc">
+    Futbolda pas ve şut kararlarının kalitesini ölçen, Graph Attention Network (GAT) tabanlı 
+    bir <strong>Decision Quality Score</strong> modeli. Oyuncu, takım ve bağlamsal özellikler 
+    tek bir graf çerçevesinde birleştiriliyor.
+  </p>
+  <div class="hero-badge">
+    <span class="big">%10.5</span>
+    <span class="label">MAE İyileştirmesi — xT Baseline → xPass++ DQS</span>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    KAYDIRIN
+  </div>
+</section>
+
+<!-- METRICS -->
+<section class="section" id="metrics">
+  <div class="section-header reveal">
+    <div class="section-label">Performans Metrikleri</div>
+    <h2>Model Karşılaştırması</h2>
+  </div>
+  <div class="metrics-grid">
+    <!-- Baseline -->
+    <div class="metric-card baseline reveal">
+      <span class="card-tag">v1.0</span>
+      <div class="card-title">xT-Temeli Baseline</div>
+      <div class="metrics-list">
+        <div class="metric-row">
+          <span class="metric-name">MAE</span>
+          <span class="metric-val">0.1847</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:100%;background:var(--muted);"></div></div>
+        <div class="metric-row">
+          <span class="metric-name">MSE</span>
+          <span class="metric-val">0.0523</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:100%;background:var(--muted);"></div></div>
+        <div class="metric-row">
+          <span class="metric-name">Spearman ρ</span>
+          <span class="metric-val">0.612</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:66%;background:var(--muted);"></div></div>
+      </div>
+    </div>
+    <!-- Sprint-2 GAT -->
+    <div class="metric-card sprint2 reveal reveal-delay-1">
+      <span class="card-tag">v2.0</span>
+      <div class="card-title">Sprint-2 GAT</div>
+      <div class="metrics-list">
+        <div class="metric-row">
+          <span class="metric-name">MAE</span>
+          <span class="metric-val">0.1721</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:93%;background:var(--teal);"></div></div>
+        <div class="metric-row">
+          <span class="metric-name">MSE</span>
+          <span class="metric-val">0.0478</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:91%;background:var(--teal);"></div></div>
+        <div class="metric-row">
+          <span class="metric-name">Spearman ρ</span>
+          <span class="metric-val">0.681</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:73%;background:var(--teal);"></div></div>
+      </div>
+      <div class="improvement-badge">
+        <span class="arrow">↑</span> Baseline'a göre +6.8% MAE iyileşmesi
+      </div>
+    </div>
+    <!-- xPass++ DQS -->
+    <div class="metric-card xpass reveal reveal-delay-2">
+      <span class="card-tag">v3.0 · FINAL</span>
+      <div class="card-title">xPass++ DQS</div>
+      <div class="metrics-list">
+        <div class="metric-row">
+          <span class="metric-name">MAE</span>
+          <span class="metric-val">0.1653</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:89%;background:linear-gradient(90deg,var(--teal),var(--mint));"></div></div>
+        <div class="metric-row">
+          <span class="metric-name">MSE</span>
+          <span class="metric-val">0.0441</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:84%;background:linear-gradient(90deg,var(--teal),var(--mint));"></div></div>
+        <div class="metric-row">
+          <span class="metric-name">Spearman ρ</span>
+          <span class="metric-val">0.724</span>
+        </div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:78%;background:linear-gradient(90deg,var(--teal),var(--mint));"></div></div>
+      </div>
+      <div class="improvement-badge">
+        <span class="arrow">↑</span> Baseline'a göre +10.5% MAE iyileşmesi
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FIGURES -->
+<section class="section" id="figures">
+  <div class="section-header reveal">
+    <div class="section-label">Sonuç Grafikleri</div>
+    <h2>Eğitim & Karşılaştırma</h2>
+  </div>
+  <div class="figures-grid">
+    <div class="figure-card reveal">
+      <img src="docs/figures/mae_comparison.png" alt="MAE Karşılaştırması"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+      <div class="img-placeholder" style="display:none;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <span>docs/figures/mae_comparison.png</span>
+      </div>
+      <div class="figure-caption">
+        <strong>Şekil 1 — MAE Karşılaştırması</strong>
+        Baseline, Sprint-2 GAT ve xPass++ DQS modellerinin MAE değerlerinin yan yana karşılaştırması.
+      </div>
+    </div>
+    <div class="figure-card reveal reveal-delay-1">
+      <img src="docs/figures/training_curves.png" alt="Eğitim Eğrileri"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+      <div class="img-placeholder" style="display:none;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>docs/figures/training_curves.png</span>
+      </div>
+      <div class="figure-caption">
+        <strong>Şekil 2 — Eğitim Eğrileri</strong>
+        Epoch başına train/validation kaybı ve erken durdurma noktası.
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- PITCH -->
+<section class="section" id="pitch">
+  <div class="section-header reveal">
+    <div class="section-label">Demo Görselleştirmesi</div>
+    <h2>Saha Üzerinde DQS Haritası</h2>
+  </div>
+  <div class="pitch-full reveal">
+    <img src="docs/figures/demo_dqs_pitch.png" alt="DQS Saha Haritası"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+    <div class="img-placeholder" style="display:none;min-height:340px;">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <rect x="2" y="5" width="20" height="14" rx="1"/>
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <rect x="2" y="9" width="4" height="6"/>
+        <rect x="18" y="9" width="4" height="6"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      <span>docs/figures/demo_dqs_pitch.png</span>
+    </div>
+    <div class="pitch-caption">
+      <p>Her piksel, o konumdan verilen kararın GAT tarafından hesaplanan <strong>Decision Quality Score</strong>'unu temsil eder. Yeşil → yüksek kaliteli karar, kırmızı → düşük kaliteli.</p>
+      <span class="tag">DQS · xPass++ v3.0</span>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="section-header reveal">
+    <div class="section-label">Sistem Akışı</div>
+    <h2>Nasıl Çalışır?</h2>
+  </div>
+  <div class="flow reveal">
+    <div class="flow-step">
+      <div class="step-num">ADIM 01</div>
+      <span class="step-icon">📡</span>
+      <div class="step-title">Veri</div>
+      <div class="step-desc">StatsBomb açık veri — 64 maç, 73.946 pas/şut eylemi. Konum, zaman, oyuncu ve bağlamsal özellikler.</div>
+      <span class="step-tag">64 Maç · 73,946 Graf</span>
+    </div>
+    <div class="flow-arrow">›</div>
+    <div class="flow-step">
+      <div class="step-num">ADIM 02</div>
+      <span class="step-icon">🕸️</span>
+      <div class="step-title">Graf</div>
+      <div class="step-desc">Her eylem için oyuncu pozisyonları düğüm, etkileşimler kenar olarak modellenir. Konum tabanlı mesafe eşiği ile bağlantılar kurulur.</div>
+      <span class="step-tag">Düğüm · Kenar · Özellik</span>
+    </div>
+    <div class="flow-arrow">›</div>
+    <div class="flow-step">
+      <div class="step-num">ADIM 03</div>
+      <span class="step-icon">🧠</span>
+      <div class="step-title">GAT</div>
+      <div class="step-desc">3 katman Graph Attention Network. 4 dikkat kafası × 128 gizli boyut. Komşu düğümlere ağırlıklı dikkat mekanizması.</div>
+      <span class="step-tag">3L · 4H · 128D · ~211K param</span>
+    </div>
+    <div class="flow-arrow">›</div>
+    <div class="flow-step">
+      <div class="step-num">ADIM 04</div>
+      <span class="step-icon">🎯</span>
+      <div class="step-title">DQS</div>
+      <div class="step-desc">Çıktı: 0–1 arası Decision Quality Score. Pas mı verilmeli, şut mu atılmalı? Hangi bölgede karar kalitesi yüksek?</div>
+      <span class="step-tag">0.0 → 1.0 · DQS</span>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- TECH DETAILS -->
+<section class="section" id="tech">
+  <div class="section-header reveal">
+    <div class="section-label">Teknik Detaylar</div>
+    <h2>Model Mimarisi & Veri Seti</h2>
+  </div>
+  <div class="tech-grid">
+    <div class="tech-card reveal">
+      <h3>🏗 Model Mimarisi</h3>
+      <ul class="spec-list">
+        <li><span class="spec-key">Mimari</span><span class="spec-val">Graph Attention Network</span></li>
+        <li><span class="spec-key">Katman Sayısı</span><span class="spec-val">3 GAT Katmanı</span></li>
+        <li><span class="spec-key">Dikkat Kafası</span><span class="spec-val">4 Multi-Head</span></li>
+        <li><span class="spec-key">Gizli Boyut</span><span class="spec-val">128</span></li>
+        <li><span class="spec-key">Toplam Parametre</span><span class="spec-val">~211,000</span></li>
+        <li><span class="spec-key">Aktivasyon</span><span class="spec-val">ELU + Dropout 0.3</span></li>
+        <li><span class="spec-key">Optimizasyon</span><span class="spec-val">AdamW · LR 1e-3</span></li>
+        <li><span class="spec-key">Erken Durdurma</span><span class="spec-val">Patience = 15</span></li>
+      </ul>
+    </div>
+    <div class="tech-card reveal reveal-delay-1">
+      <h3>📊 Veri Seti</h3>
+      <ul class="spec-list">
+        <li><span class="spec-key">Kaynak</span><span class="spec-val">StatsBomb Open Data</span></li>
+        <li><span class="spec-key">Maç Sayısı</span><span class="spec-val">64 Maç</span></li>
+        <li><span class="spec-key">Graf Sayısı</span><span class="spec-val">73,946</span></li>
+        <li><span class="spec-key">Eylem Türleri</span><span class="spec-val">Pas + Şut</span></li>
+        <li><span class="spec-key">Düğüm Özellikleri</span><span class="spec-val">16 Boyut</span></li>
+        <li><span class="spec-key">Kenar Özellikleri</span><span class="spec-val">8 Boyut</span></li>
+        <li><span class="spec-key">Train / Val / Test</span><span class="spec-val">70 / 15 / 15 %</span></li>
+        <li><span class="spec-key">Framework</span><span class="spec-val">PyTorch Geometric</span></li>
+      </ul>
+    </div>
+    <div class="tech-card reveal reveal-delay-2" style="grid-column: 1 / -1;">
+      <h3>💻 Model Tanımı (Özet)</h3>
+      <div class="code-block">
+<span class="comment"># xPass++ GAT — 3 Katman, 4 Kafa, 128 Gizli Boyut</span>
+<span class="kw">class</span> xPassPlusPlusGAT(torch.nn.Module):
+    <span class="kw">def</span> __init__(self, in_channels=<span class="num">16</span>, hidden=<span class="num">128</span>, heads=<span class="num">4</span>):
+        self.gat1 = GATConv(in_channels,  hidden, heads=heads,  dropout=<span class="num">0.3</span>)
+        self.gat2 = GATConv(hidden*heads, hidden, heads=heads,  dropout=<span class="num">0.3</span>)
+        self.gat3 = GATConv(hidden*heads, hidden, heads=<span class="num">1</span>,     dropout=<span class="num">0.3</span>)
+        self.dqs_head = Linear(hidden, <span class="num">1</span>)  <span class="comment"># → Decision Quality Score</span>
+
+    <span class="kw">def</span> forward(self, x, edge_index):
+        x = F.elu(self.gat1(x, edge_index))
+        x = F.elu(self.gat2(x, edge_index))
+        x = F.elu(self.gat3(x, edge_index))
+        <span class="kw">return</span> torch.sigmoid(self.dqs_head(x))  <span class="comment"># [0, 1] DQS çıktısı</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">xPass++</div>
+    <div class="footer-meta">
+      Graph Attention Network · Decision Quality Score · Futbol Analizi
+    </div>
+    <div class="footer-tags">
+      <span class="footer-tag">PyTorch Geometric</span>
+      <span class="footer-tag">GAT</span>
+      <span class="footer-tag">StatsBomb</span>
+      <span class="footer-tag">xPass</span>
+      <span class="footer-tag">DQS</span>
+      <span class="footer-tag">Graph Neural Networks</span>
+    </div>
+    <div class="footer-meta" style="margin-top:.6rem;">
+      xPass++ — Futbolda Karar Kalitesi Modelleme Projesi
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+  }, { threshold: 0.12 });
+  reveals.forEach(el => io.observe(el));
+
+  // Animate metric bars on scroll
+  const bars = document.querySelectorAll('.metric-bar-fill');
+  const barIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const fill = e.target;
+        const w = fill.style.width;
+        fill.style.width = '0';
+        requestAnimationFrame(() => {
+          setTimeout(() => { fill.style.width = w; }, 80);
+        });
+        barIO.unobserve(fill);
+      }
+    });
+  }, { threshold: 0.5 });
+  bars.forEach(b => barIO.observe(b));
+</script>
+</body>
+</html>
