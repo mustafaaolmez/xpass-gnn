@@ -1,0 +1,34 @@
+# xPass++ — Python dependencies (pinned).
+#
+# CUDA NOTE (read before installing):
+#   PyPI's default `torch` wheel is CPU-only on Windows. To get the CUDA build
+#   on an RTX 4050 Laptop, install torch from the PyTorch index URL FIRST,
+#   then run `pip install -r requirements.txt` (which will be a no-op for torch
+#   since the pinned version is already satisfied):
+#
+#       pip install --index-url https://download.pytorch.org/whl/cu126 torch==2.11.0
+#       pip install -r requirements.txt
+#
+#   The CUDA channel index is documented at https://pytorch.org/get-started/locally/
+#   Choice of cu126: verified on 2026-05-12 that
+#   https://download.pytorch.org/whl/cu126/torch/ hosts torch==2.11.0 wheels
+#   for Windows cp312/cp313, while the older cu124 index only ships up to
+#   torch==2.6.0.
+#
+# Each pin below has a `# Ref:` comment pointing to its PyPI JSON endpoint,
+# which was queried on 2026-05-12 for the latest stable release.
+
+torch==2.11.0                  # Ref: https://pypi.org/pypi/torch/json
+torch-geometric==2.7.0         # Ref: https://pypi.org/pypi/torch-geometric/json
+statsbombpy==1.18.0            # Ref: https://pypi.org/pypi/statsbombpy/json
+pandas==3.0.3                  # Ref: https://pypi.org/pypi/pandas/json
+numpy==2.4.4                   # Ref: https://pypi.org/pypi/numpy/json
+scikit-learn==1.8.0            # Ref: https://pypi.org/pypi/scikit-learn/json
+matplotlib==3.10.9             # Ref: https://pypi.org/pypi/matplotlib/json
+mplsoccer==1.6.1               # Ref: https://pypi.org/pypi/mplsoccer/json
+pytest==9.0.3                  # Ref: https://pypi.org/pypi/pytest/json
+ruff==0.15.12                  # Ref: https://pypi.org/pypi/ruff/json
+black==26.3.1                  # Ref: https://pypi.org/pypi/black/json
+ipykernel==7.2.0               # Ref: https://pypi.org/pypi/ipykernel/json
+fastparquet==2026.3.0          # Ref: https://pypi.org/pypi/fastparquet/json (Sprint 1; parquet engine. Swapped from pyarrow — see autonomous_log L2 note 2026-05-13: pyarrow's eager cloudpickle import triggers a Windows _fill_cache failure on the project root.)
+cloudpickle==3.1.2             # Ref: https://pypi.org/pypi/cloudpickle/json (Sprint 1; pulled in by fastparquet/pyarrow ecosystem; explicit pin)
