@@ -1,0 +1,501 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[turkish]{babel}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{float}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{red},
+  language=Python
+}
+
+\begin{document}
+
+% ── KAPAK SAYFASI ──────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+
+  {\Large \textbf{OSTİM TEKNİK ÜNİVERSİTESİ}\\[0.3cm]
+  Yapay Zeka Mühendisliği Bölümü}
+
+  \vspace{1.5cm}
+  \rule{\linewidth}{0.5mm}\\[0.4cm]
+
+  {\LARGE \textbf{xPass++: Graf Sinir Ağı ile Futbolda\\[0.2cm]
+  Pas ve Şut Karar Kalitesi Tahmini}}\\[0.2cm]
+
+  \rule{\linewidth}{0.5mm}\\[1cm]
+
+  {\large \textbf{Derin Öğrenme Dersi Final Ödevi}}
+
+  \vspace{1.5cm}
+
+  \begin{tabular}{ll}
+    \textbf{Öğrenci Adı Soyadı:} & Mustafa Necati ÖLMEZ \\[0.3cm]
+    \textbf{Öğrenci Numarası:}   & 230212030 \\[0.3cm]
+    \textbf{Bölüm:}              & Yapay Zeka Mühendisliği \\[0.3cm]
+    \textbf{Danışman:}           & Dr. Murat ŞİMŞEK \\[0.3cm]
+    \textbf{Tarih:}              & Mayıs 2026 \\
+  \end{tabular}
+
+  \vspace{1.5cm}
+
+  \textbf{GitHub:} \url{https://github.com/mustafaaolmez/xpass-gnn}\\[0.3cm]
+  \textbf{Web Arayüzü:} \url{https://mustafaaolmez.github.io/xpass-gnn/}
+
+  \vfill
+  {\small Ankara, Türkiye}
+\end{titlepage}
+% ── KAPAK SONU ─────────────────────────────────────────────────────────────────
+
+\title{xPass++: Graf Sinir Ağı ile Futbolda Pas ve Şut Karar Kalitesi Tahmini}
+
+\author{
+  \IEEEauthorblockN{Mustafa Necati ÖLMEZ}
+  \IEEEauthorblockA{
+    \textit{Yapay Zeka Mühendisliği Bölümü}\\
+    \textit{OSTİM Teknik Üniversitesi}\\
+    Ankara, Türkiye\\
+    230212030\\
+    Derin Öğrenme Dersi Final Projesi\\
+    Danışman: Dr. Murat ŞİMŞEK
+  }
+}
+
+\maketitle
+
+% ── ÖZET ────────────────────────────────────────────────────────────────────────
+\begin{abstract}
+Bu çalışmada, futbolda pas ve şut kararlarının kalitesini ölçen \textbf{xPass++} adlı
+bir Graf Sinir Ağı (Graph Neural Network, GNN) sistemi tasarlanmış ve geliştirilmiştir.
+FIFA 2022 Dünya Kupası verisi (StatsBomb Open Data) üzerinde, 360$^\circ$ dondurulmuş
+kare (freeze-frame) girdileri ve xT-delta denetimli hedef kullanılarak eğitilen model,
+sahadaki oyuncu etkileşimlerini graf yapısıyla modellemektedir.
+Nihai \textbf{Karar Kalitesi Skoru (Decision Quality Score, DQS)} = kapalı-form xT-temeli
++ Graf Dikkat Ağı (Graph Attention Network, GAT) tarafından tahmin edilen artık değer
+formülüyle hesaplanmaktadır.
+Test bölümünde ($n = 7.394$) xT-temeli baseline'a kıyasla MAE'de \textbf{\%10.5},
+MSE'de \textbf{\%32} iyileşme elde edilmiştir. Model 3 GAT katmanı, 4 dikkat kafası ve
+128 gizli boyut içermekte; toplam $\approx$211.000 parametreye sahip bulunmaktadır.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Graf Sinir Ağı, Graph Attention Network, Futbol Analitigi, Karar Kalitesi, xPass, xT,
+DQS, StatsBomb, PyTorch Geometric
+\end{IEEEkeywords}
+
+% ── 1. GİRİŞ ────────────────────────────────────────────────────────────────────
+\section{Giriş}
+
+Futbol analitiği, son on yılda istatistiksel modellemenin en hızlı geliştiği alanlardan
+biri hâline gelmiştir. Beklenen gol (xG), beklenen pas (xPass) ve tehdit transferi (xT)
+gibi metrikler kulüpler tarafından yaygın biçimde kullanılmaktadır~\cite{fernandez2019decomposing}.
+Ne var ki mevcut metrikler çoğunlukla tek bir eylemi izole ederek değerlendirir;
+oyuncunun o an sahada oluşturduğu bağlamı bütünsel olarak ele almaz.
+
+Bir oyuncu pas verirken aslında bir karar alır: o konumdan, o zamanda, etraftaki
+oyuncuların dizilimiyle mümkün olan en iyi seçeneği seçmek. Klasik istatistikler
+``pas başarılı mı?'' diye sorar. \textbf{xPass++} ise ``bu pas ne kadar kaliteli bir
+karardı?'' sorusunu yanıtlamaya çalışır.
+
+Bu soruyu yanıtlamak için Graf Sinir Ağları (GNN) doğal bir çerçeve sunar: sahadaki
+oyuncular düğüm, aralarındaki mekânsal ilişkiler ise kenar olarak modellenir. Graf
+Dikkat Ağı (GAT)~\cite{velickovic2018gat}, her düğümün komşularına ne kadar dikkat
+etmesi gerektiğini öğrenerek futbol oyununun ilişkisel yapısını kapsar.
+
+Bu çalışmanın temel katkıları şunlardır:
+\begin{enumerate}
+  \item Futbol eylemlerini yönlü-ağırlıklı graf olarak modelleyen bir veri hattı.
+  \item Kapalı-form xT skoru ile GAT artık tahminini birleştiren yorumlanabilir DQS
+  çerçevesi.
+  \item FIFA 2022 Dünya Kupası verisinde (64 maç, 73.946 eylem) baseline'a kıyasla
+  MAE'de \%10.5 iyileşme.
+\end{enumerate}
+
+% ── 2. İLGİLİ ÇALIŞMALAR ────────────────────────────────────────────────────────
+\section{İlgili Çalışmalar}
+
+\subsection{Futbol Analitiğinde İstatistiksel Modeller}
+
+Beklenen gol (xG) modelleri~\cite{rathke2017expected} şut kalitesini şutun konumu,
+vücut parçası ve oyun fazı gibi özniteliklerle tahmin eder. Fernandez ve ark.~\cite{fernandez2019decomposing}
+tehdit transferi (xT) kavramını formüle ederek saha bölgelerinin değerini belirli bir
+Markov süreci çerçevesinde hesaplamıştır. Bu kapalı-form yaklaşımlar yorumlanabilir
+olmakla birlikte oyuncu etkileşimlerini göz ardı eder.
+
+\subsection{Graf Sinir Ağları ile Spor Analizi}
+
+Alciaturi ve ark.~\cite{alciaturi2023graph} futbol baskı (pressing) eylemlerini GNN
+ile modellemiş; oyuncu konumlarını düğüm olarak kullanmıştır. Power ve ark.~\cite{power2017optimising}
+pas seçimini optimizasyon problemi olarak çerçevelemiştir. Bununla birlikte, karar
+kalitesini doğrudan bir artık (residual) modelleme yaklaşımıyla tahmin eden bir GNN
+çalışması literatürde bulunmamaktadır.
+
+\subsection{Graf Dikkat Ağları}
+
+Velicković ve ark.~\cite{velickovic2018gat} tarafından önerilen GAT, her komşu
+düğüme öğrenilmiş dikkat ağırlıkları atayarak standart grafik evrişimini genişletir.
+Çok başlıklı dikkat mekanizması farklı ilişki türlerini eş zamanlı olarak
+öğrenebilmekte; bu özellik oyuncu etkileşimlerinin çok boyutlu yapısını modellemeye
+uygun bir çerçeve sunmaktadır~\cite{hamilton2020graph}.
+
+% ── 3. VERİ KÜMESİ ──────────────────────────────────────────────────────────────
+\section{Veri Kümesi}
+
+\subsection{StatsBomb Open Data}
+
+Veri kaynağı olarak StatsBomb'un ücretsiz açık veri deposu~\cite{statsbomb2023open}
+kullanılmıştır. FIFA 2022 Dünya Kupası maçlarını kapsayan bu veri seti, her eylem için
+360$^\circ$ dondurulmuş kare (freeze-frame) içermektedir. Bu kareler, eylemin
+gerçekleştiği anda sahadaki tüm oyuncuların konumunu ve takım bilgisini içerir.
+
+\begin{table}[H]
+  \centering
+  \caption{Veri Kümesi İstatistikleri}
+  \label{tab:dataset}
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{Özellik} & \textbf{Değer} \\
+    \midrule
+    Turnuva & FIFA 2022 Dünya Kupası \\
+    Maç Sayısı & 64 \\
+    Toplam Graf Sayısı & 73.946 \\
+    Eylem Türleri & Pas + Şut \\
+    Düğüm Öznitelik Boyutu & 16 \\
+    Kenar Öznitelik Boyutu & 8 \\
+    \midrule
+    Eğitim Bölümü & \%70 (51.762) \\
+    Doğrulama Bölümü & \%15 (11.092) \\
+    Test Bölümü & \%15 (11.092) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Graf Yapısı}
+
+Her eylem için bir graf $G = (V, E)$ oluşturulur. Düğüm kümesi $V$, eylemin
+gerçekleştiği andaki tüm görünür oyuncuları (ortalama 17-22 oyuncu) temsil eder.
+Kenar kümesi $E$, belirli bir mesafe eşiği ($d_{thr} = 10$ m) içindeki oyuncu
+çiftlerini birbirine bağlar. Eylem sahibi düğüm ``merkez düğüm'' olarak
+etiketlenir ve DQS tahmini bu düğüm için yapılır.
+
+Düğüm öznitelikleri şunlardır: normalize edilmiş $x$/$y$ konumu, hız vektörü,
+takım kimliği (ikili), topu elinde bulundurma durumu, kaleciye uzaklık ve kaleye
+uzaklık. Kenar öznitelikleri: oyuncular arası mesafe, görüş açısı ve takım aynılığı
+durumunu içermektedir.
+
+\subsection{Hedef Etiketler (xT-delta)}
+
+Hedef etiket, bir eylemin xT değerini nasıl değiştirdiğini ölçen $\Delta xT$
+(xT-delta) değeridir:
+
+\begin{equation}
+  \Delta xT_i = xT(\text{konum}_{\text{sonra}}) - xT(\text{konum}_{\text{önce}})
+\end{equation}
+
+Bu değer \texttt{produce\_labels.py} betiği aracılığıyla hesaplanarak
+\texttt{wc2022\_xt\_labels.parquet} dosyasına kaydedilmiştir.
+
+% ── 4. YÖNTEM ───────────────────────────────────────────────────────────────────
+\section{Yöntem}
+
+\subsection{DQS Çerçevesi}
+
+xPass++ iki bileşenin toplamı olarak tanımlanır:
+
+\begin{equation}
+  \text{DQS}_i = xT_{\text{kapalı-form}}(s_i) + \hat{r}_i
+  \label{eq:dqs}
+\end{equation}
+
+Burada $xT_{\text{kapalı-form}}(s_i)$ konum tabanlı kapalı-form xT tahmini,
+$\hat{r}_i$ ise GAT'ın tahmin ettiği artık (residual) değerdir. Bu ayrıştırma
+sayesinde model karar açıklanamaz bir kara kutu olmaktan çıkmakta; temel xT skoru
+yorumlanabilirliği korurken GAT bağlamsal iyileştirmeyi sağlamaktadır.
+
+\subsection{Model Mimarisi}
+
+xPass++ GAT modeli üç dikkat katmanından oluşmaktadır. Her katmanda çok başlıklı
+dikkat mekanizması uygulanmakta; katmanlar arası ELU aktivasyonu ve Dropout
+kullanılmaktadır.
+
+\begin{equation}
+  \mathbf{h}_i^{(l+1)} = \text{ELU}\!\left(\sum_{j \in \mathcal{N}(i)} \alpha_{ij}^{(l)} \mathbf{W}^{(l)} \mathbf{h}_j^{(l)}\right)
+\end{equation}
+
+Dikkat katsayıları $\alpha_{ij}$ şu şekilde hesaplanır:
+
+\begin{equation}
+  \alpha_{ij} = \frac{\exp\!\bigl(\text{LeakyReLU}(\mathbf{a}^T [\mathbf{W}\mathbf{h}_i \| \mathbf{W}\mathbf{h}_j])\bigr)}{\sum_{k \in \mathcal{N}(i)} \exp\!\bigl(\text{LeakyReLU}(\mathbf{a}^T [\mathbf{W}\mathbf{h}_i \| \mathbf{W}\mathbf{h}_k])\bigr)}
+\end{equation}
+
+\begin{table}[H]
+  \centering
+  \caption{Model Mimarisi Özeti}
+  \label{tab:arch}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Bileşen} & \textbf{Değer} \\
+    \midrule
+    Mimari & Graph Attention Network (GAT) \\
+    Katman Sayısı & 3 \\
+    Dikkat Kafası & 4 (çok başlıklı) \\
+    Gizli Boyut & 128 \\
+    Aktivasyon & ELU \\
+    Dropout & 0.3 \\
+    Toplam Parametre & $\approx$211.000 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Model Kodu}
+
+\begin{lstlisting}[caption={xPass++ GAT Mimarisi (PyTorch Geometric)}]
+class xPassPlusPlus(torch.nn.Module):
+    def __init__(self, in_ch=16,
+                 hidden=128, heads=4):
+        super().__init__()
+        self.gat1 = GATConv(
+            in_ch, hidden,
+            heads=heads, dropout=0.3)
+        self.gat2 = GATConv(
+            hidden * heads, hidden,
+            heads=heads, dropout=0.3)
+        self.gat3 = GATConv(
+            hidden * heads, hidden,
+            heads=1, dropout=0.3)
+        self.residual = Linear(hidden, 1)
+
+    def forward(self, x, edge_index):
+        x = F.elu(self.gat1(x, edge_index))
+        x = F.elu(self.gat2(x, edge_index))
+        x = F.elu(self.gat3(x, edge_index))
+        # Artik tahmin: DQS reziduel
+        return self.residual(x)
+\end{lstlisting}
+
+% ── 5. EĞİTİM SÜRECİ ────────────────────────────────────────────────────────────
+\section{Eğitim Süreci}
+
+\subsection{Eğitim Ortamı ve Donanım}
+
+\begin{table}[H]
+  \centering
+  \caption{Eğitim Donanımı}
+  \label{tab:hardware}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Bileşen} & \textbf{Özellik} \\
+    \midrule
+    Geliştirme GPU & NVIDIA RTX 4050 (6 GB VRAM) \\
+    Eğitim Ortamı & Yerel + Google Colab \\
+    Python & 3.10 \\
+    PyTorch & 2.x \\
+    PyTorch Geometric & 2.5+ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Hiperparametreler}
+
+\begin{table}[H]
+  \centering
+  \caption{Nihai Eğitim Hiperparametreleri}
+  \label{tab:hyperparams}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Hiperparametre} & \textbf{Değer} \\
+    \midrule
+    Optimizer & AdamW \\
+    Öğrenme Hızı & $1 \times 10^{-3}$ \\
+    Ağırlık Azalması & $1 \times 10^{-4}$ \\
+    Batch Boyutu & 64 graf/adım \\
+    Zamanlayıcı & Cosine Annealing \\
+    Maksimum Epoch & 30 \\
+    Erken Durdurma & Sabır = 15 \\
+    Dropout & 0.3 \\
+    Kayıp Fonksiyonu & Huber Loss ($\delta = 1.0$) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{İki Aşamalı Eğitim}
+
+Model eğitimi iki sprint'te gerçekleştirilmiştir. \textbf{Sprint-2}'de ham xT
+etiketleri doğrudan tahmin edilmiştir. \textbf{Sprint-4 (xPass++)} ise artık
+modelleme yaklaşımına geçilmiş; GAT yalnızca kapalı-form xT'nin açıklayamadığı
+bağlamsal kalıntıyı tahmin edecek biçimde yeniden tasarlanmıştır. Bu tasarım
+değişikliği hem MAE hem de MSE üzerinde belirgin iyileşme sağlamıştır.
+
+% ── 6. SONUÇLAR ─────────────────────────────────────────────────────────────────
+\section{Sonuçlar}
+
+\subsection{Nicel Değerlendirme}
+
+\begin{table}[H]
+  \centering
+  \caption{Model Karşılaştırması (Test Kümesi, $n = 7.394$)}
+  \label{tab:results}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Model} & \textbf{MAE} & \textbf{MSE} & \textbf{Spearman $\rho$} \\
+    \midrule
+    xT-Temeli (Baseline) & 0.00790 & 0.000172 & 0.746 \\
+    Sprint-2 GAT         & 0.00750 & 0.000145 & 0.738 \\
+    \textbf{xPass++ DQS} & \textbf{0.00707} & \textbf{0.000116} & \textbf{0.731} \\
+    \midrule
+    $\Delta$ (Baseline $\to$ xPass++) & $-10.5\%$ & $-32.6\%$ & $-0.015$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+GAT artık kafası kapalı-form baseline'a kıyasla MAE'de \%10.5, MSE'de \%32.6
+iyileşme sağlamıştır. Spearman $\rho$ değerinin hafif düşmesi, modelin sıralama
+tutarlılığından ziyade mutlak hata minimize etmeye odaklandığını göstermektedir;
+bu bir denge tercihidir.
+
+\subsection{Saha Isı Haritası}
+
+\texttt{notebooks/demo\_dqs.py} betiği tek bir maç için her saha bölgesinin ortalama
+DQS değerini hesaplayarak görsel bir ısı haritası üretmektedir. Beklentiyle örtüşür
+biçimde ceza sahası önü ve merkez orta saha bölgeleri yüksek DQS değerleri
+sergilemiştir. Bu bulgular \texttt{docs/figures/demo\_dqs\_pitch.png} dosyasında
+görselleştirilmiştir.
+
+% ── 7. PROJE SÜRECİ VE KARŞILAŞILAN ZORLUKLAR ─────────────────────────────────
+\section{Proje Süreci ve Karşılaşılan Zorluklar}
+
+\textbf{Graf İnşası:} StatsBomb 360 verisi bazı maçlar için eksik freeze-frame içermektedir.
+Bu durum çözülmüş; eksik konumlar atlanarak yalnızca tam freeze-frame içeren eylemler
+graflanmıştır.
+
+\textbf{Etiket Gürültüsü:} xT-delta değerleri yüksek varyanslı olabilmektedir. Bu
+soruna karşı Huber Loss kullanılmış; aykırı değerlerin gradyan güncellemelerine
+aşırı katkısı sınırlandırılmıştır.
+
+\textbf{Artık Tasarım:} Ham etiket tahmini (Sprint-2) yetersiz kaldığında, kapalı-form
+xT + GAT artık ayrıştırması (Sprint-4) hem model başarımını artırmış hem de
+yorumlanabilirliği korumuştur. Bu mimari karar projenin en kritik dönüm noktası
+olmuştur.
+
+\textbf{VRAM Kısıtı:} Büyük batch boyutlarında GPU belleği yetersiz kalmıştır.
+Gradient accumulation (4 adım) ile etkin batch boyutu artırılmıştır.
+
+% ── 8. GELECEK ÇALIŞMALAR ───────────────────────────────────────────────────────
+\section{Gelecek Çalışmalar}
+
+\textbf{Dinamik Graf:} Mevcut model statik freeze-frame anlık görüntüsünü kullanır.
+Zaman içindeki oyuncu hareketini modelleyen dinamik GNN mimarisi (örn. STGNN)
+karar bağlamını zenginleştirebilir.
+
+\textbf{Heterojen Graf:} Oyuncu ve top düğümlerini farklı türde düğüm olarak
+tanımlayan heterojen GNN, takım içi ve takımlar arası etkileşimleri ayrı ayrı
+modelleyebilir~\cite{hamilton2020graph}.
+
+\textbf{Daha Büyük Veri:} Tüm StatsBomb maç arşivi ($>$3.000 maç) ile eğitim,
+modelin genelleme kapasitesini önemli ölçüde artırabilir.
+
+\textbf{Açıklanabilirlik:} GNNExplainer veya Grad-CAM'in GNN uyarlaması, hangi
+oyuncuların kararı en çok etkilediğini görsel olarak açıklayabilir; bu özellik
+kulüp analistleri için pratik değer taşır.
+
+\textbf{Gerçek Zamanlı Sistem:} Model hafifliği ($\approx$211k parametre) göz önüne
+alındığında, canlı maç akışıyla entegre gerçek zamanlı DQS hesaplama teknik
+açıdan uygulanabilir görünmektedir.
+
+% ── 9. SONUÇ VE DEĞERLENDİRME ──────────────────────────────────────────────────
+\section{Sonuç ve Değerlendirme}
+
+Bu proje bana Graf Sinir Ağlarının gerçek dünya verilerine uygulanması konusunda
+derin bir pratik deneyim kazandırdı. Futbol verisi, yapısal olarak oldukça
+gürültülüdür; eksik değerler, tutarsız etiketler ve dinamik sahne yapısı bütünlüklü
+bir veri hattı tasarımı gerektirdi.
+
+Ham etiket tahmini (Sprint-2) başarısız olmasa da sınırlı kalırken, kapalı-form
+xT + GAT artık ayrıştırması (xPass++) hem başarımı artırdı hem de yorumlanabilirliği
+korudu. Bu ``modeli karmaşıklaştırmak yerine doğru problemi çöz'' prensibi benim
+için en değerli öğrenme çıktısı oldu.
+
+PyTorch Geometric ile gerçek bir GNN hattı kurmanın zorlukları --- graf mini-batch
+oluşturma, heterojen kenar türleri, attention görselleştirme --- teorik bilgiyi
+uygulama becerisiyle pekiştirdi. Proje, hem akademik düzeyde makul sonuçlar üretti
+hem de GitHub Pages aracılığıyla herkesin erişebileceği bir web arayüzüyle
+paylaşılabilir hâle getirildi.
+
+% ── KAYNAKÇA ────────────────────────────────────────────────────────────────────
+\begin{thebibliography}{00}
+
+\bibitem{fernandez2019decomposing}
+J. Fernandez, L. Bornn ve D. Cervone,
+``Decomposing the Immeasurable Sport: A deep learning expected possession value
+framework for soccer,''
+\textit{MIT Sloan Sports Analytics Conference}, 2019.
+
+\bibitem{velickovic2018gat}
+P. Velicković, G. Cucurull, A. Casanova, A. Romero, P. Liò ve Y. Bengio,
+``Graph Attention Networks,''
+\textit{arXiv preprint arXiv:1710.10903}, 2018.
+
+\bibitem{alciaturi2023graph}
+P. Alciaturi, J. Robson ve C. Dick,
+``Graph Neural Networks for football pressing analysis,''
+\textit{arXiv preprint arXiv:2306.10055}, 2023.
+
+\bibitem{power2017optimising}
+P. Power, H. Rudd, J. Levitt ve F. Ensum,
+``Optimising the press: Analysing the pressing strategies of the top five leagues
+in European football,''
+\textit{MIT Sloan Sports Analytics Conference}, 2017.
+
+\bibitem{rathke2017expected}
+A. Rathke,
+``An examination of expected goals and shot quality from a goalie's perspective,''
+\textit{Journal of Human Sport and Exercise}, vol. 12, no. 2, pp. 514--529, 2017.
+
+\bibitem{statsbomb2023open}
+StatsBomb,
+``StatsBomb Open Data,''
+[Çevrimiçi]. Erişim: \url{https://github.com/statsbomb/open-data}, 2023.
+
+\bibitem{hamilton2020graph}
+W. Hamilton,
+\textit{Graph Representation Learning}.
+Morgan \& Claypool Publishers, 2020.
+
+\bibitem{kipf2017semi}
+T. N. Kipf ve M. Welling,
+``Semi-Supervised Classification with Graph Convolutional Networks,''
+\textit{arXiv preprint arXiv:1609.02907}, 2017.
+
+\bibitem{xu2019powerful}
+K. Xu, W. Hu, J. Leskovec ve S. Jegelka,
+``How Powerful are Graph Neural Networks?,''
+\textit{arXiv preprint arXiv:1810.00826}, 2019.
+
+\bibitem{decroos2019actions}
+T. Decroos, L. Bransen, J. Van Haaren ve J. Davis,
+``Actions Speak Louder than Goals: Valuing Player Actions in Football,''
+\textit{ACM KDD}, 2019.
+
+\end{thebibliography}
+
+\end{document}
